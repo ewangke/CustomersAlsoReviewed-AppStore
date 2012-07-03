@@ -2,8 +2,11 @@
 Find what customers also reviewed based on a centain app, specifically in China App Store
 First version by ewangke at gmail.com
 """
-import urllib2
+from gevent import monkey; monkey.patch_all()
 import sys
+import gevent
+from gevent.queue import Queue
+import urllib2
 from bs4 import BeautifulSoup
 
 if len(sys.argv) != 2:
@@ -13,6 +16,46 @@ if len(sys.argv) != 2:
 productID = sys.argv[1]
 front = '143465-1,12'   # 143465 is the store ID, I don't know -1,12 means. To check all other store ids, see https://github.com/grych/AppStoreReviews/blob/master/AppStoreReviews.py
 userAgent = 'iTunes/10.1.1 (Macintosh; Intel Mac OS X 10.6.5) AppleWebKit/533.19.4'     # Change your user agent if u want
+
+relations = {}  # key: App Name, value: count
+relations['only-self'] = 0
+
+WORKER_COUNT = 10
+tasks = Queue()
+
+def worker(pid):
+    while not tasks.empty():
+        task = tasks.get()
+        print('Worker %s got task %s' % (pid, task))
+        processReviewerLink(task)
+
+    print('Worker %s done!' % pid)
+
+
+def processReviewerLink(link):
+    # FIXIT: we only handle the first page review here
+    reviewer_id = link.replace('http://itunes.apple.com/WebObjects/MZStore.woa/wa/viewUsersUserReviews?userProfileId=', '')
+    reviewer_url = "http://itunes.apple.com//WebObjects/MZStore.woa/wa/allUserReviewsForReviewerFragment?userProfileId=%s&page=1&sort=14" % reviewer_id
+    req = urllib2.Request(reviewer_url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
+
+    # FIXIT: Handle possible network exception
+    u = urllib2.urlopen(req, timeout=30)
+    soup = BeautifulSoup(u.read(), "lxml")
+    nodes = soup.findAll("div", {"class": "lockup small detailed option application"})
+
+    if nodes is None:
+        print 'Oops! %s has no reviews' % reviewer_id
+        return
+
+    if len(nodes) == 1:
+        relations['only-self'] += 1
+    else:
+        for node in nodes:
+            app_name = node.find("li", {"class": "name"}).contents[0].contents[0]
+            if app_name in relations:
+                relations[app_name] += 1
+            else:
+                relations[app_name] = 1
 
 
 def analyze(productID):
@@ -31,36 +74,9 @@ def analyze(productID):
     review_count = len(links)
     print 'Finish getting reviewers: %d reviewers found.' % review_count
 
-    relations = {}  # key: App Name, value: count
-    relations['only-self'] = 0
-
-    # FIXIT: Spawn threads to fetch web pages concurrently
     for link in links:
-        # FIXIT: we only handle the first page review here
-        reviewer_id = link.replace('http://itunes.apple.com/WebObjects/MZStore.woa/wa/viewUsersUserReviews?userProfileId=', '')
-        reviewer_url = "http://itunes.apple.com//WebObjects/MZStore.woa/wa/allUserReviewsForReviewerFragment?userProfileId=%s&page=1&sort=14" % reviewer_id
-        req = urllib2.Request(reviewer_url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
-
-        # FIXIT: Handle possible network exception
-        u = urllib2.urlopen(req, timeout=30)
-        soup = BeautifulSoup(u.read(), "lxml")
-        nodes = soup.findAll("div", {"class": "lockup small detailed option application"})
-
-        if nodes is None:
-            print 'Oops! %s has no reviews' % reviewer_id
-            continue
-
-        if len(nodes) == 1:
-            relations['only-self'] += 1
-        else:
-            for node in nodes:
-                app_name = node.find("li", {"class": "name"}).contents[0].contents[0]
-                if app_name in relations:
-                    relations[app_name] += 1
-                else:
-                    relations[app_name] = 1
-
-        #print 'link %s processed' % link
+        tasks.put_nowait(link)
+    gevent.joinall([gevent.spawn(worker, i) for i in xrange(WORKER_COUNT)])
 
     #for k in relations:
     #    print "%s\t%s\n" % (k.encode('utf-8'), relations[k])
@@ -70,7 +86,6 @@ def analyze(productID):
     output_file = codecs.open("sorted_result.json", encoding='utf-8', mode='w')
     json.dump(sorted_relations, output_file)
     output_file.close()
-
 
 def get_reviewer_links(productID, page):
     result = []
