@@ -8,7 +8,7 @@
 ####安装[Beautiful Soap](http://www.crummy.com/software/BeautifulSoup/bs4/doc/#installing-beautiful-soup)
 我的ubuntu版本，需要手动下载[安装包](http://www.crummy.com/software/BeautifulSoup/bs4/download/4.0/beautifulsoup4-4.0.0b3.tar.gz)，之后执行：
     `python setup.py install`
-####安装gevent(http://www.gevent.org/intro.html#installation)
+####安装[gevent](http://www.gevent.org/intro.html#installation)
 	`easy_install greenlet`
 	`sudo apt-get install libevent`
 
@@ -27,6 +27,9 @@
 * Bug请提交到Issues
 * 作者是python菜，请python熟的朋友帮助我改进代码及性能(可能有问题的地方，我已经用FIXIT标明；)
 * 开发问题可联系ewangke at gmail.com
+
+###Contributors
+* [yuchao](https://github.com/yuchao), [用gevent多线程处理请求, 目前设置了10个](https://github.com/ewangke/CustomersAlsoReviewed-AppStore/commit/011adcbf74c814be77a8e3f2cdaba62720aa296e)
 
 ###Copyright
 This script is FREE to use, copy or modifiy for both commercial and non-commercial purpose.
