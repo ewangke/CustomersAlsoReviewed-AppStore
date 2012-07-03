@@ -9,6 +9,7 @@ from gevent.queue import Queue
 import urllib2
 from bs4 import BeautifulSoup
 
+
 if len(sys.argv) != 2:
     print 'Usage: analyze.py <productID>'
     exit(0)
@@ -65,7 +66,7 @@ def analyze(productID):
         links_per_page = get_reviewer_links(productID, page)
         if links_per_page != []:
             links.extend(links_per_page)
-            #print 'Get reviewers: Page %d processed' % page
+            print 'Get reviewers: Page %d processed' % page
             page += 1
 
         else:
@@ -83,7 +84,7 @@ def analyze(productID):
     sorted_relations = sorted(relations.items(), key=lambda relations: relations[1])
     import json
     import codecs
-    output_file = codecs.open("sorted_result.json", encoding='utf-8', mode='w')
+    output_file = codecs.open("%s.json" % productID, encoding='utf-8', mode='w')
     json.dump(sorted_relations, output_file)
     output_file.close()
 
