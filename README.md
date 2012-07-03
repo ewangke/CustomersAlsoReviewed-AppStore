@@ -11,6 +11,11 @@
 ####安装[gevent](http://www.gevent.org/intro.html#installation)
 	`easy_install greenlet`
 	`sudo apt-get install libevent`
+    `sudo apt-get install python-gevent` // For Ubuntu 10.04
+
+###Mac版本安装，需要[HomeBrew](http://mxcl.github.com/homebrew/)：
+    `brew install libevent`
+    `pip install greenlet`
 
 ###使用
 `python analyze.py <productID>`
