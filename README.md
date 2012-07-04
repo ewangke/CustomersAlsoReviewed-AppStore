@@ -2,12 +2,14 @@
 不谈刷榜的问题了。只介绍一下这个脚本的用途和思路。
 本脚本接收一个productID作为参数（iTunes里面链接的ID），并抓取所以评论此app的用户，他们也评论了哪些其它的app。最后按其它app作为key，数量作为value聚合。
 
-###本脚本依赖BeautifulSoup, lxml和gevent。以Ubuntu为例：
+###本脚本依赖BeautifulSoup, lxml, unicodecsv和gevent。以Ubuntu为例：
 ####安装lxml
 `sudo apt-get install python-lxml`
 ####安装[Beautiful Soap](http://www.crummy.com/software/BeautifulSoup/bs4/doc/#installing-beautiful-soup)
 我的ubuntu版本，需要手动下载[安装包](http://www.crummy.com/software/BeautifulSoup/bs4/download/4.0/beautifulsoup4-4.0.0b3.tar.gz)，之后执行：
     `python setup.py install`
+####安装unicodecsv
+    `pip install unicodecsv`
 ####安装[gevent](http://www.gevent.org/intro.html#installation)
 	`easy_install greenlet`
 	`sudo apt-get install libevent`
@@ -19,6 +21,9 @@
 
 ###使用
 `python analyze.py <productID>`
+
+###输出
+根据指定的productID, 生成中国区该app的评论相关性csv格式的表格
 
 ###Known Issues
 * 抓取用户评论的所有app，目前只抓取了第一页6个。最完整的结果应该抓取所有评论过的app，但请求至少会翻倍，而且“特殊”账号普通评论过的app不超过6个

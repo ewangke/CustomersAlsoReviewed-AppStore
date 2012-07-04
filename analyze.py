@@ -2,13 +2,15 @@
 Find what customers also reviewed based on a centain app, specifically in China App Store
 First version by ewangke at gmail.com
 """
-from gevent import monkey; monkey.patch_all()
 import sys
-import gevent
-from gevent.queue import Queue
 import urllib2
 from bs4 import BeautifulSoup
-
+import unicodecsv
+from gevent import monkey
+monkey.patch_all()
+import gevent
+from gevent.queue import Queue
+import datetime
 
 if len(sys.argv) != 2:
     print 'Usage: analyze.py <productID>'
@@ -23,6 +25,7 @@ relations['only-self'] = 0
 
 WORKER_COUNT = 10
 tasks = Queue()
+
 
 def worker(pid):
     while not tasks.empty():
@@ -81,12 +84,12 @@ def analyze(productID):
 
     #for k in relations:
     #    print "%s\t%s\n" % (k.encode('utf-8'), relations[k])
-    sorted_relations = sorted(relations.items(), key=lambda relations: relations[1])
-    import json
-    import codecs
-    output_file = codecs.open("%s.json" % productID, encoding='utf-8', mode='w')
-    json.dump(sorted_relations, output_file)
-    output_file.close()
+    output_filename = get_app_title(productID)
+    sorted_relations = sorted(relations.items(), key=lambda relations: relations[1], reverse=True)
+    csv_writer = unicodecsv.writer(open('%s-%s.csv' % (output_filename, str(datetime.date.today())), 'w'))
+    for relation in sorted_relations:
+        csv_writer.writerow(relation)
+
 
 def get_reviewer_links(productID, page):
     result = []
@@ -102,6 +105,15 @@ def get_reviewer_links(productID, page):
         reviewers = all_reviews.findAll("a", {"class": "reviewer"})
         result = [link['href'] for link in reviewers]
     return result
+
+
+def get_app_title(productID):
+    url = "http://itunes.apple.com/cn/app/id%s?mt=8" % productID
+    req = urllib2.Request(url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
+    u = urllib2.urlopen(req, timeout=30)
+    soup = BeautifulSoup(u.read(), "lxml")
+    app_title = soup.find("div", {"class": "title"}).find("a").contents[0]
+    return app_title
 
 
 if __name__ == "__main__":
