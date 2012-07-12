@@ -2,7 +2,6 @@
 Find what customers also reviewed based on a centain app, specifically in China App Store
 First version by ewangke at gmail.com
 """
-import sys
 import urllib2
 from bs4 import BeautifulSoup
 import unicodecsv
@@ -11,26 +10,134 @@ monkey.patch_all()
 import gevent
 from gevent.queue import Queue
 import datetime
+import argparse
 
-if len(sys.argv) != 2:
-    print 'Usage: analyze.py <productID>'
+appStores = {
+'Argentina':            143505,
+'Australia':            143460,
+'Belgium':              143446,
+'Brazil':               143503,
+'Canada':               143455,
+'Chile':                143483,
+'China':                143465,
+'Colombia':             143501,
+'Costa Rica':           143495,
+'Croatia':              143494,
+'Czech Republic':       143489,
+'Denmark':              143458,
+'Deutschland':          143443,
+'El Salvador':          143506,
+'Espana':               143454,
+'Finland':              143447,
+'France':               143442,
+'Greece':               143448,
+'Guatemala':            143504,
+'Hong Kong':            143463,
+'Hungary':              143482,
+'India':                143467,
+'Indonesia':            143476,
+'Ireland':              143449,
+'Israel':               143491,
+'Italia':               143450,
+'Korea':                143466,
+'Kuwait':               143493,
+'Lebanon':              143497,
+'Luxembourg':           143451,
+'Malaysia':             143473,
+'Mexico':               143468,
+'Nederland':            143452,
+'New Zealand':          143461,
+'Norway':               143457,
+'Osterreich':           143445,
+'Pakistan':             143477,
+'Panama':               143485,
+'Peru':                 143507,
+'Phillipines':          143474,
+'Poland':               143478,
+'Portugal':             143453,
+'Qatar':                143498,
+'Romania':              143487,
+'Russia':               143469,
+'Saudi Arabia':         143479,
+'Schweiz/Suisse':       143459,
+'Singapore':            143464,
+'Slovakia':             143496,
+'Slovenia':             143499,
+'South Africa':         143472,
+'Sri Lanka':            143486,
+'Sweden':               143456,
+'Taiwan':               143470,
+'Thailand':             143475,
+'Turkey':               143480,
+'United Arab Emirates': 143481,
+'United Kingdom':       143444,
+'United States':        143441,
+'Venezuela':            143502,
+'Vietnam':              143471,
+'Japan':                143462,
+'Dominican Republic':   143508,
+'Ecuador':              143509,
+'Egypt':                143516,
+'Estonia':              143518,
+'Honduras':             143510,
+'Jamaica':              143511,
+'Kazakhstan':           143517,
+'Latvia':               143519,
+'Lithuania':            143520,
+'Macau':                143515,
+'Malta':                143521,
+'Moldova':              143523,
+'Nicaragua':            143512,
+'Paraguay':             143513,
+'Uruguay':              143514
+}
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-p", "--product_id", help="Required. ID for app in App Store")
+parser.add_argument("-v", "--verbose", help="show verbose log", action="store_true")
+parser.add_argument("-l", "--list", help="list all store ids.", action="store_true")
+parser.add_argument("-c", "--count", help="get the oldest ammount of pages of reviews, default is 10.", type=int, default=10)
+parser.add_argument("-s", "--store_id", help="country/region for app store, default is China.", default='143465')
+parser.add_argument("-w", "--worker_count", help="concurrent worker count, default is 10.", type=int, default=10)
+args = parser.parse_args()
+
+should_list_stores = args.list
+if should_list_stores:
+    print '%20s%20s' % ("Store", "StoreID")
+    for key in appStores:
+        print "%20s%20s" % (key, appStores[key])
     exit(0)
 
-productID = sys.argv[1]
-front = '143465-1,12'   # 143465 is the store ID, I don't know -1,12 means. To check all other store ids, see https://github.com/grych/AppStoreReviews/blob/master/AppStoreReviews.py
-userAgent = 'iTunes/10.1.1 (Macintosh; Intel Mac OS X 10.6.5) AppleWebKit/533.19.4'     # Change your user agent if u want
+verbose = args.verbose
+page_limit = args.count
+store_id = args.store_id
+worker_count = args.worker_count
+product_id = args.product_id
+#print product_id
+#print verbose
+#print count
+#print store_id
+#print worker_count
+#print should_list_stores
 
+if product_id is None:
+    print 'product_id is required. Use the -p parameter'
+    exit(0)
+
+# 143465(China) is the store ID, I don't know -1,12 means
+# To check all other store ids, see https://github.com/grych/AppStoreReviews/blob/master/AppStoreReviews.py
+front = '%s-1,12' % store_id
+userAgent = 'iTunes/10.1.1 (Macintosh; Intel Mac OS X 10.6.5) AppleWebKit/533.19.4'     # Change your user agent if u want
 relations = {}  # key: App Name, value: count
 relations['only-self'] = 0
-
-WORKER_COUNT = 10
 tasks = Queue()
 
 
 def worker(pid):
     while not tasks.empty():
         task = tasks.get()
-        print('Worker %s got task %s' % (pid, task))
+        if verbose:
+            print('Worker %s got task %s' % (pid, task))
         processReviewerLink(task)
 
     print('Worker %s done!' % pid)
@@ -62,15 +169,18 @@ def processReviewerLink(link):
                 relations[app_name] = 1
 
 
-def analyze(productID):
+def analyze(product_id):
     links = []
     page = 1
     while(1):
-        links_per_page = get_reviewer_links(productID, page)
+        links_per_page = get_reviewer_links(product_id, page)
         if links_per_page != []:
             links.extend(links_per_page)
-            print 'Get reviewers: Page %d processed' % page
+            if verbose:
+                print 'Get reviewers: Page %d processed' % page
             page += 1
+            if page > page_limit:
+                break
 
         else:
             break
@@ -80,21 +190,21 @@ def analyze(productID):
 
     for link in links:
         tasks.put_nowait(link)
-    gevent.joinall([gevent.spawn(worker, i) for i in xrange(WORKER_COUNT)])
+    gevent.joinall([gevent.spawn(worker, i) for i in xrange(worker_count)])
 
     #for k in relations:
     #    print "%s\t%s\n" % (k.encode('utf-8'), relations[k])
-    output_filename = get_app_title(productID)
+    output_filename = get_app_title(product_id)
     sorted_relations = sorted(relations.items(), key=lambda relations: relations[1], reverse=True)
     csv_writer = unicodecsv.writer(open('%s-%s.csv' % (output_filename, str(datetime.date.today())), 'w'))
     for relation in sorted_relations:
         csv_writer.writerow(relation)
 
 
-def get_reviewer_links(productID, page):
+def get_reviewer_links(product_id, page):
     result = []
 
-    url = "http://itunes.apple.com/WebObjects/MZStore.woa/wa/customerReviews?s=143465-1,12&id=%s&displayable-kind=11&page=%d&sort=4" % (productID, page)
+    url = "http://itunes.apple.com/WebObjects/MZStore.woa/wa/customerReviews?s=143465-1,12&id=%s&displayable-kind=11&page=%d&sort=4" % (product_id, page)
     req = urllib2.Request(url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
 
     # FIXIT: Handle possible network exception
@@ -107,8 +217,8 @@ def get_reviewer_links(productID, page):
     return result
 
 
-def get_app_title(productID):
-    url = "http://itunes.apple.com/cn/app/id%s?mt=8" % productID
+def get_app_title(product_id):
+    url = "http://itunes.apple.com/cn/app/id%s?mt=8" % product_id
     req = urllib2.Request(url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
     u = urllib2.urlopen(req, timeout=30)
     soup = BeautifulSoup(u.read(), "lxml")
@@ -117,4 +227,4 @@ def get_app_title(productID):
 
 
 if __name__ == "__main__":
-    analyze(productID)
+    analyze(product_id)
