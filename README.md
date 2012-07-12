@@ -22,18 +22,24 @@
     pip install unicodecsv
 
 ###使用方法
-    -h, --help            show this help message and exit
-      -p PRODUCT_ID, --product_id PRODUCT_ID
-                            Required. ID for app in App Store
-      -v, --verbose         show verbose log
-      -l, --list            list all store ids.
-      -c COUNT, --count COUNT
-                            get the oldest ammount of pages of reviews, default is
-                            10.
-      -s STORE_ID, --store_id STORE_ID
-                            country/region for app store, default is China.
-      -w WORKER_COUNT, --worker_count WORKER_COUNT
-                            concurrent worker count, default is 10.
+<pre>
+usage: analyze.py [-h] [-p PRODUCT_ID] [-v] [-l] [-c COUNT] [-s STORE_ID]
+                  [-w WORKER_COUNT]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PRODUCT_ID, --product_id PRODUCT_ID
+                        Required. ID for app in App Store
+  -v, --verbose         show verbose log
+  -l, --list            list all store ids.
+  -c COUNT, --count COUNT
+                        get the oldest ammount of pages of reviews, default is
+                        10.
+  -s STORE_ID, --store_id STORE_ID
+                        country/region for app store, default is China.
+  -w WORKER_COUNT, --worker_count WORKER_COUNT
+                        concurrent worker count, default is 10.
+</pre>
 
 ####如何阅读生成的csv文件
 * 评论的相关数按降序排列
