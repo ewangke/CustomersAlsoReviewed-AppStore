@@ -20,6 +20,7 @@
     pip install greenlet
     pip install lxml
     pip install unicodecsv
+    pip install beautifulsoup4
 
 ###使用方法
 <pre>
