@@ -16,11 +16,11 @@
     sudo apt-get install python-gevent // For Ubuntu 10.04
 
 ###Mac版本安装，需要[HomeBrew](http://mxcl.github.com/homebrew/)：
+    pip install beautifulsoup4
     brew install libevent
     pip install greenlet
     pip install lxml
     pip install unicodecsv
-    pip install beautifulsoup4
 
 ###使用方法
 <pre>
