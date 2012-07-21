@@ -149,8 +149,14 @@ def processReviewerLink(link):
     reviewer_url = "http://itunes.apple.com//WebObjects/MZStore.woa/wa/allUserReviewsForReviewerFragment?userProfileId=%s&page=1&sort=14" % reviewer_id
     req = urllib2.Request(reviewer_url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
 
-    # FIXIT: Handle possible network exception
-    u = urllib2.urlopen(req, timeout=30)
+    # Handle possible network exception
+    while True:
+        try:
+            u = urllib2.urlopen(req, timeout=15)
+            break
+        except:
+            print 'Fail to get %s' % reviewer_url
+
     soup = BeautifulSoup(u.read(), "lxml")
     nodes = soup.findAll("div", {"class": "lockup small detailed option application"})
 
@@ -207,8 +213,14 @@ def get_reviewer_links(product_id, page):
     url = "http://itunes.apple.com/WebObjects/MZStore.woa/wa/customerReviews?s=143465-1,12&id=%s&displayable-kind=11&page=%d&sort=4" % (product_id, page)
     req = urllib2.Request(url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
 
-    # FIXIT: Handle possible network exception
-    u = urllib2.urlopen(req, timeout=30)
+    # Handle possible network exception
+    while True:
+        try:
+            u = urllib2.urlopen(req, timeout=15)
+            break
+        except:
+            print 'Fail to get %s' % url
+
     soup = BeautifulSoup(u.read(), "lxml")
     all_reviews = soup.find("div", {"class": "paginate all-reviews"})
     if all_reviews:
@@ -220,7 +232,15 @@ def get_reviewer_links(product_id, page):
 def get_app_title(product_id):
     url = "http://itunes.apple.com/cn/app/id%s?mt=8" % product_id
     req = urllib2.Request(url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
-    u = urllib2.urlopen(req, timeout=30)
+
+    # Handle possible network exception
+    while True:
+        try:
+            u = urllib2.urlopen(req, timeout=15)
+            break
+        except:
+            print 'Fail to get %s' % url
+
     soup = BeautifulSoup(u.read(), "lxml")
     app_title = soup.find("div", {"class": "title"}).find("a").contents[0]
     return app_title

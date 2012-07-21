@@ -135,7 +135,6 @@ United Arab Emirates              143481
 
 ###Known Issues
 * 抓取用户评论的所有app，目前只抓取了第一页6个。最完整的结果应该抓取所有评论过的app，但请求至少会翻倍，而且“特殊”账号普通评论过的app不超过6个
-* 代码不健壮，没有做异常处理并retry
 
 ###如何获得请求的地址：
 * 使用tcpdump来监测iTunes请求的实际地址：`sudo tcpdump -s 0 -A -i en0 port 80`
