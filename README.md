@@ -35,7 +35,7 @@ optional arguments:
   -l, --list            list all store ids.
   -c COUNT, --count COUNT
                         get the oldest ammount of pages of reviews, default is
-                        10.
+                        all pages.
   -s STORE_ID, --store_id STORE_ID
                         country/region for app store, default is China.
   -w WORKER_COUNT, --worker_count WORKER_COUNT

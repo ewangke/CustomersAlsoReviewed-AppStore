@@ -11,6 +11,7 @@ import gevent
 from gevent.queue import Queue
 import datetime
 import argparse
+import sys
 
 appStores = {
 'Argentina':            143505,
@@ -96,7 +97,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--product_id", help="Required. ID for app in App Store")
 parser.add_argument("-v", "--verbose", help="show verbose log", action="store_true")
 parser.add_argument("-l", "--list", help="list all store ids.", action="store_true")
-parser.add_argument("-c", "--count", help="get the oldest ammount of pages of reviews, default is 10.", type=int, default=10)
+parser.add_argument("-c", "--count", help="get the oldest ammount of pages of reviews, default is all pages.", type=int, default=sys.maxint)
 parser.add_argument("-s", "--store_id", help="country/region for app store, default is China.", default='143465')
 parser.add_argument("-w", "--worker_count", help="concurrent worker count, default is 10.", type=int, default=10)
 args = parser.parse_args()
@@ -126,28 +127,64 @@ if product_id is None:
 
 # 143465(China) is the store ID, I don't know -1,12 means
 # To check all other store ids, see https://github.com/grych/AppStoreReviews/blob/master/AppStoreReviews.py
-front = '%s-1,12' % store_id
+store_front = '%s-1,12' % store_id
 userAgent = 'iTunes/10.1.1 (Macintosh; Intel Mac OS X 10.6.5) AppleWebKit/533.19.4'     # Change your user agent if u want
 relations = {}  # key: App Name, value: count
+links = []  # links for reviewers
 relations['only-self'] = 0
 tasks = Queue()
 
 
-def worker(pid):
+def page_worker(pid):
     while not tasks.empty():
         task = tasks.get()
         if verbose:
-            print('Worker %s got task %s' % (pid, task))
+            print('Page_worker %s got page with number %s' % (pid, task))
+        processPage(task)
+
+    print('Page_worker %s done!' % pid)
+
+
+def reviewer_worker(pid):
+    while not tasks.empty():
+        task = tasks.get()
+        if verbose:
+            print('Reviewer_worker %s got reviewer link %s' % (pid, task))
         processReviewerLink(task)
 
-    print('Worker %s done!' % pid)
+    print('Reviewer_worker %s done!' % pid)
+
+
+def processPage(page):
+    result = []
+
+    url = "http://itunes.apple.com/WebObjects/MZStore.woa/wa/customerReviews?s=%s&id=%s&displayable-kind=11&page=%d&sort=4" % (store_front, product_id, page)
+    req = urllib2.Request(url, headers={"X-Apple-Store-Front": store_front, "User-Agent": userAgent})
+
+    # Handle possible network exception
+    while True:
+        try:
+            u = urllib2.urlopen(req, timeout=15)
+            break
+        except:
+            print 'Fail to get %s' % url
+
+    soup = BeautifulSoup(u.read(), "lxml")
+    all_reviews = soup.find("div", {"class": "paginate all-reviews"})
+    if all_reviews:
+        reviewers = all_reviews.findAll("a", {"class": "reviewer"})
+        result = [link['href'] for link in reviewers]
+    if result != []:
+        links.extend(result)
+    if verbose:
+        print 'Get reviewers: Page %d processed' % page
 
 
 def processReviewerLink(link):
     # FIXIT: we only handle the first page review here
     reviewer_id = link.replace('http://itunes.apple.com/WebObjects/MZStore.woa/wa/viewUsersUserReviews?userProfileId=', '')
     reviewer_url = "http://itunes.apple.com//WebObjects/MZStore.woa/wa/allUserReviewsForReviewerFragment?userProfileId=%s&page=1&sort=14" % reviewer_id
-    req = urllib2.Request(reviewer_url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
+    req = urllib2.Request(reviewer_url, headers={"X-Apple-Store-Front": store_front, "User-Agent": userAgent})
 
     # Handle possible network exception
     while True:
@@ -176,27 +213,17 @@ def processReviewerLink(link):
 
 
 def analyze(product_id):
-    links = []
-    page = 1
-    while(1):
-        links_per_page = get_reviewer_links(product_id, page)
-        if links_per_page != []:
-            links.extend(links_per_page)
-            if verbose:
-                print 'Get reviewers: Page %d processed' % page
-            page += 1
-            if page > page_limit:
-                break
+    page_count = get_reviews_page_count(product_id)
+    for page_number in xrange(1, page_count + 1):
+        tasks.put_nowait(page_number)
+    gevent.joinall([gevent.spawn(page_worker, i) for i in xrange(worker_count)])
 
-        else:
-            break
-
-    review_count = len(links)
-    print 'Finish getting reviewers: %d reviewers found.' % review_count
+    reviewer_count = len(links)
+    print 'Finish getting reviewers: %d reviewers found.' % reviewer_count
 
     for link in links:
         tasks.put_nowait(link)
-    gevent.joinall([gevent.spawn(worker, i) for i in xrange(worker_count)])
+    gevent.joinall([gevent.spawn(reviewer_worker, i) for i in xrange(worker_count)])
 
     #for k in relations:
     #    print "%s\t%s\n" % (k.encode('utf-8'), relations[k])
@@ -207,31 +234,29 @@ def analyze(product_id):
         csv_writer.writerow(relation)
 
 
-def get_reviewer_links(product_id, page):
-    result = []
-
-    url = "http://itunes.apple.com/WebObjects/MZStore.woa/wa/customerReviews?s=143465-1,12&id=%s&displayable-kind=11&page=%d&sort=4" % (product_id, page)
-    req = urllib2.Request(url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
-
-    # Handle possible network exception
+def get_reviews_page_count(product_id):
+    # TODO: get pages count
+    url = "http://itunes.apple.com/WebObjects/MZStore.woa/wa/customerReviews?s=%s&id=%s&displayable-kind=11&page=%d&sort=4" % (store_front, product_id, 1)
+    req = urllib2.Request(url, headers={"X-Apple-Store-Front": store_front, "User-Agent": userAgent})
     while True:
         try:
             u = urllib2.urlopen(req, timeout=15)
             break
         except:
-            print 'Fail to get %s' % url
+            print 'Fail to get total page count, retry'
 
     soup = BeautifulSoup(u.read(), "lxml")
     all_reviews = soup.find("div", {"class": "paginate all-reviews"})
-    if all_reviews:
-        reviewers = all_reviews.findAll("a", {"class": "reviewer"})
-        result = [link['href'] for link in reviewers]
-    return result
+    if all_reviews != []:
+        page_count = int(all_reviews.find("div", {"class": "paginated-content"})["total-number-of-pages"])
+    page_count = min(page_limit, page_count)
+    print 'Total page count is %d' % page_count
+    return page_count
 
 
 def get_app_title(product_id):
     url = "http://itunes.apple.com/cn/app/id%s?mt=8" % product_id
-    req = urllib2.Request(url, headers={"X-Apple-Store-Front": front, "User-Agent": userAgent})
+    req = urllib2.Request(url, headers={"X-Apple-Store-Front": store_front, "User-Agent": userAgent})
 
     # Handle possible network exception
     while True:
