@@ -196,7 +196,7 @@ def analyze(product_id):
     #    print "%s\t%s\n" % (k.encode('utf-8'), relations[k])
     output_filename = get_app_title(product_id)
     sorted_relations = sorted(relations.items(), key=lambda relations: relations[1], reverse=True)
-    csv_writer = unicodecsv.writer(open('%s-%s.csv' % (output_filename, str(datetime.date.today())), 'w'))
+    csv_writer = unicodecsv.writer(open('%s-%s.csv' % (output_filename.encode('utf-8'), str(datetime.date.today())), 'w'), encoding='utf-8')
     for relation in sorted_relations:
         csv_writer.writerow(relation)
 
